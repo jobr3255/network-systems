@@ -184,8 +184,7 @@ void getFromServer(struct ServerConnectionInfo connection, char *buf, char *vari
 	}
 
 	FILE *fptr;
-	// char *path = getFilePath(variable);
-	fptr = fopen(getFilePath(variable),"wb");
+	fptr = fopen(variable,"wb");
 	fwrite(buf, 1, n, fptr);
 	fclose(fptr);
 	printf("Successfully received '%s' \n", variable);
@@ -209,12 +208,17 @@ void putToServer(struct ServerConnectionInfo connection, char *buf, char *variab
 	// sendToServer(buf, connection);
 	if( fileExists(variable) ) {
 		FILE *file;
-		file = fopen(getFilePath(variable),"rb");
-		int size = getFileSize(file);
-		char *fileBuf;
-		fileBuf = fileToBuffer(file, size);
+		file = fopen(variable,"rb");
+	  int size = getFileSize(file);
+		// Read binary
+		char ch;
+	  char fileBuf[size];
+	  for (int i = 0; i < size; i++) {
+	      ch = fgetc(file);
+	      fileBuf[i] = ch;
+	  }
 		fclose(file);
-		connection.n = size;
+
 		strcat(buf, fileBuf);
 		sendToServer(connection, buf, size);
 		getServerResponse(connection);
@@ -255,13 +259,13 @@ void listServerFiles(struct ServerConnectionInfo connection, char *buf) {
 	getServerResponse(connection);
 	DIR *d;
 	struct dirent *dir;
-	d = opendir(FILES_DIR);
+	d = opendir(".");
 	char *fileName;
 	char tempBuf[BUFSIZE] = "";
 	if (d) {
 		while ((dir = readdir(d)) != NULL) {
 			fileName = dir->d_name;
-			if(strcmp(fileName, ".") != 0 && strcmp(fileName, "..") != 0) {
+			if(contains(fileName, "foo")) {
 				strcat(tempBuf, fileName);
 				strcat(tempBuf, " ");
 			}

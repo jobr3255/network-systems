@@ -480,4 +480,4 @@ Total Number of Instances            24000
 
      a     b   <-- classified as
   8776  3224 |     a = 1
-  1774 10226 |    �  0;RG�
+  1774 10226 |     b = -1

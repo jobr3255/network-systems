@@ -4,8 +4,6 @@
 #define BUFSIZE 65535
 // #define BUFSIZE 1024
 
-static const char FILES_DIR[] = "files";
-
 /*
  * error - wrapper for perror
  */
@@ -109,24 +107,6 @@ void extractCommandAndVariable(char *buf, char *command, char *variable) {
 }
 
 /**
- *  Build and return path to file
- *
- *  @param char *fileName
- *      Name of the file
- *  @return char *
- *      Full file path
- */
-char * getFilePath(char *fileName) {
-	char *temp;
-	temp = malloc(1024);
-	strcpy(temp, FILES_DIR);
-	strcat(temp, "/");
-	strcat(temp, fileName);
-	return temp;
-}
-
-
-/**
  *  Determines existence of file
  *
  *  @param char *fileName
@@ -134,8 +114,7 @@ char * getFilePath(char *fileName) {
  *  @return bool
  */
 bool fileExists(char *fileName) {
-	char *path = getFilePath(fileName);
-	return (access( path, F_OK ) != -1);
+	return (access( fileName, F_OK ) != -1);
 }
 
 /**
@@ -150,22 +129,4 @@ int getFileSize(FILE *file){
   int size = ftell(file); // get current file pointer
   fseek(file, 0, SEEK_SET); // seek back to beginning of file
   return size;
-}
-
-/**
- *  Reads the file into a buffer
- *
- *  @param char *fileName
- *      Name of the file
- *  @return int
- */
-char * fileToBuffer(FILE *file, int size){
-  char ch;
-  char *buf;
-	buf = malloc(size);
-  for (int i = 0; i < size; i++) {
-      ch = fgetc(file);
-      buf[i] = ch;
-  }
-  return buf;
 }

@@ -184,14 +184,22 @@ void processGet(struct ClientConnectionInfo connection, char *variable) {
 	// Check if file exists on server
 	if( fileExists(variable) ) {
 		FILE *file;
-		file = fopen(getFilePath(variable),"rb");
-		int size = getFileSize(file);
-		char *buf;
-		buf = fileToBuffer(file, size);
+		file = fopen(variable,"rb");
+	  int size = getFileSize(file);
+		// Read binary
+		char ch;
+	  char buf[size];
+	  for (int i = 0; i < size; i++) {
+	      ch = fgetc(file);
+	      buf[i] = ch;
+	  }
 		fclose(file);
-		connection.n = size;
-		sendToClient(connection, buf, size);
+
 		printf("Sent file of size %d\n", size);
+		sendToClient(connection, buf, size);
+
+		// char buf[BUFSIZE] = "ERROR: TEST";
+		// sendToClient(connection, buf, strlen(buf));
 	} else {
 		printf("File '%s' does not exist on server. Sent error\n", variable);
 		sendMessageToClient(connection, "ERROR: '", variable, "' does not exist on the server!");
@@ -215,8 +223,7 @@ void processPut(struct ClientConnectionInfo connection, char *buf, char *variabl
 	subbuff[size - index] = '\0';
 	// printf("Put: '%s'\n", subbuff);
 	FILE *file;
-	// char *path = getFilePath(variable);
-	file = fopen(getFilePath(variable),"wb");
+	file = fopen(variable,"wb");
 	fwrite(subbuff, 1, size, file);
 	fclose(file);
 	printf("Successfully received '%s' \n", variable);
@@ -234,7 +241,7 @@ void processPut(struct ClientConnectionInfo connection, char *buf, char *variabl
 void processDelete(struct ClientConnectionInfo connection, char *variable) {
 	printf("Server received delete request for '%s'\n", variable);
 	if(fileExists(variable)) {
-		remove(getFilePath(variable));
+		remove(variable);
 		printf("Server deleted '%s'\n", variable);
 		sendMessageToClient(connection, "Successfully deleted '", variable, "'");
 	}else{
@@ -255,13 +262,17 @@ void processLS(struct ClientConnectionInfo connection) {
 	printf("Server received ls request\n");
 	DIR *d;
 	struct dirent *dir;
-	d = opendir(FILES_DIR);
+	d = opendir(".");
 	char *fileName;
 	char buf[BUFSIZE] = "";
 	if (d) {
 		while ((dir = readdir(d)) != NULL) {
 			fileName = dir->d_name;
-			if(strcmp(fileName, ".") != 0 && strcmp(fileName, "..") != 0) {
+			// if(strcmp(fileName, ".") != 0 && strcmp(fileName, "..") != 0) {
+			// 	strcat(buf, fileName);
+			// 	strcat(buf, " ");
+			// }
+			if(contains(fileName, "foo")) {
 				strcat(buf, fileName);
 				strcat(buf, " ");
 			}
