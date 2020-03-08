@@ -46,7 +46,7 @@ bool contains(char *str, char *find) {
 }
 
 /**
- *  This extracts the cmethod, uri, and version from a command
+ *  This extracts the method, uri, and version from a command
  */
 void extractCommand(char *command, char *method, char *uri, char *version) {
 	char delim[] = " ";
@@ -68,9 +68,12 @@ void extractCommand(char *command, char *method, char *uri, char *version) {
 	// printf("method: '%s' uri: '%s' version: '%s' \n", method, uri, version);
 }
 
+/**
+ *  This extracts the data from a command
+ */
 void extractPostData(char *request, char *data){
-	printf("Request: \n");
-	printf("%s\n\n", request);
+	// printf("Request: \n");
+	// printf("%s\n\n", request);
 	char delim[] = "\r\n";
 	char *temp;
 	char tempBuf[BUFSIZE];
@@ -81,7 +84,7 @@ void extractPostData(char *request, char *data){
 	memset(prevLine, 0, BUFSIZE);
 	int size = 0;
 	while (temp != NULL) {
-		printf("temp: '%s' \n", temp);
+		// printf("temp: '%s' \n", temp);
 		memcpy(prevLine, temp, strlen(temp));
 		size = strlen(temp);
 		temp = strtok (NULL, delim);
