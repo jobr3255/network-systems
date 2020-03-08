@@ -25,12 +25,13 @@ int main(int argc, char **argv) {
 	char *port;
 	port = argv[1];
 
-	int newfd;			// listen on sock_fd, new connection on newfd
-	struct sockaddr_storage clientAddrInfo;			// connector's address information
+	int newfd;
+	struct sockaddr_storage clientAddrInfo;	// connector's address information
 	char clientIP[INET6_ADDRSTRLEN];
 
 	// Get a listening socket
 	int listenfd = getListenerSocket(port);
+	pid_t pid;
 
 	if (listenfd < 0) {
 		fprintf(stderr, "webserver: fatal error getting listening socket\n");
@@ -41,23 +42,23 @@ int main(int argc, char **argv) {
 
 	while(1) {
 		socklen_t sin_size = sizeof clientAddrInfo;
-
-		// accept(int sockfd, struct sockaddr *cliaddr, socklen_t *addrlen);
+		// newfd is a new socket descriptor for the new connection.
 		newfd = accept(listenfd, (struct sockaddr *)&clientAddrInfo, &sin_size);
 		if (newfd == -1) {
 			perror("accept");
 			continue;
 		}
-
 		// Print out a message that we got the connection
 		inet_ntop(clientAddrInfo.ss_family,
 							getInAddr((struct sockaddr *)&clientAddrInfo),
 							clientIP, sizeof clientIP);
 		// printf("server: got connection from %s\n", clientIP);
 
-		// newfd is a new socket descriptor for the new connection.
-		handleRequest(newfd);
-
+		if ( (pid = fork()) == 0 ) {
+			handleRequest(newfd);
+      close(newfd);
+      exit(0); // child terminates
+    }
 		close(newfd);
 	}
 
