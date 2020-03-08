@@ -24,7 +24,7 @@
  */
 void handleRequest(int fd) {
 	char request[BUFSIZE];
-  memset(request, 0, BUFSIZE);
+	memset(request, 0, BUFSIZE);
 	// Read request
 	int bytesRecvd = recv(fd, request, BUFSIZE - 1, 0);
 	if (bytesRecvd < 0) {
@@ -33,14 +33,14 @@ void handleRequest(int fd) {
 	}
 	// printf("%s\n", request);
 	char tmpReq[BUFSIZE];
-  memset(tmpReq, 0, BUFSIZE);
+	memset(tmpReq, 0, BUFSIZE);
 	memcpy(tmpReq, request, strlen(request));
 	char delim[] = "\n";
 	char *temp;
 	char method[BUFSIZE], uri[BUFSIZE], version[BUFSIZE];
-  memset(method, 0, BUFSIZE);
-  memset(uri, 0, BUFSIZE);
-  memset(version, 0, BUFSIZE);
+	memset(method, 0, BUFSIZE);
+	memset(uri, 0, BUFSIZE);
+	memset(version, 0, BUFSIZE);
 	temp = strtok (request, delim);
 	printf("%s\n", temp);
 	extractCommand(temp, method, uri, version);
@@ -49,7 +49,7 @@ void handleRequest(int fd) {
 		handleGet(fd, uri, version);
 	}else if(strcmp(method,"POST") == 0) {
 		char data[BUFSIZE];
-    memset(data, 0, BUFSIZE);
+		memset(data, 0, BUFSIZE);
 		extractPostData(tmpReq, data);
 		handlePost(fd, version, data);
 	}else{
@@ -103,13 +103,13 @@ void handlePost(int fd, char *version, char* data) {
 	char tempResponse[BUFSIZE];
 	int pos = 0;
 	pos += sprintf(&tempResponse[pos], "<html>\n<body>\n<h1>Post Data</h1>\n<pre>%s</pre>\n</body>\n</html>", data);
-  char response[pos];
+	char response[pos];
 	memcpy(response, &tempResponse[0], pos);
-  // Build header
-  char header[16];
-  memcpy( header, &version[0], 8);
-  memcpy( &header[8], " 200 Ok ", 8);
-  sendResponse(fd, header, "text/html; charset=UTF-8", response, pos);
+	// Build header
+	char header[16];
+	memcpy( header, &version[0], 8);
+	memcpy( &header[8], " 200 Ok ", 8);
+	sendResponse(fd, header, "text/html; charset=UTF-8", response, pos);
 }
 
 void sendError(int fd, char *version) {
@@ -172,7 +172,6 @@ void sendError404Page(int fd, char *version) {
  * contentLength: body length
  */
 int sendResponse(int fd, char *header, char *contentType, void *body, int contentLength) {
-
 	// Build HTTP response and store it in tempResponse
 	char tempResponse[6553600];
 	int pos = 0;
@@ -193,12 +192,16 @@ int sendResponse(int fd, char *header, char *contentType, void *body, int conten
 
 	// Copy tempResponse into response which has the correct size to fit all the data
 	// Solves "Excess found in a non pipelined read" error
-	char response[responseLength];
-	memcpy(response, &tempResponse[0], pos);
+	// char response[responseLength];
+	char *response;
+	response = (char *) malloc(responseLength);
+	memcpy(response, &tempResponse[0], responseLength);
+	// strcpy(response, tempResponse);
 	// printf ("body size: %ld total size: %ld\n", contentLength, responseLength);
 	// printf("Content-Type: %s\n", contentType);
 	// Send it all!
 	int error = send(fd, response, responseLength, 0);
+	free(response);
 	if (error < 0) {
 		perror("send");
 	}

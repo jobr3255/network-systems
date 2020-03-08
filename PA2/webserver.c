@@ -53,7 +53,7 @@ int main(int argc, char **argv) {
 		inet_ntop(clientAddrInfo.ss_family,
 							getInAddr((struct sockaddr *)&clientAddrInfo),
 							clientIP, sizeof clientIP);
-		printf("server: got connection from %s\n", clientIP);
+		// printf("server: got connection from %s\n", clientIP);
 
 		// newfd is a new socket descriptor for the new connection.
 		handleRequest(newfd);
