@@ -58,17 +58,17 @@ int main(int argc, char **argv) {
 							getInAddr((struct sockaddr *)&clientAddrInfo),
 							clientIP, sizeof clientIP);
 		// printf("server: got connection from %s\n", clientIP);
-		handleRequest(newfd);
-		// if ( (pid = fork()) == 0 ) {
-		// 	// struct sockaddr_storage clientAddrInfoTmp;	// connector's address information
-		// 	// char clientIPTmp[INET6_ADDRSTRLEN];
-		// 	// memset(clientIPTmp, 0, INET6_ADDRSTRLEN);
-		// 	// memcpy(clientIPTmp, clientIP, sizeof clientIP);
-		// 	// memcpy(&clientAddrInfoTmp, &clientAddrInfo, sizeof clientAddrInfo);
-		// 	handleRequest(newfd);
-    //   close(newfd);
-    //   exit(0); // child terminates
-    // }
+		// handleRequest(newfd);
+		if ( (pid = fork()) == 0 ) {
+			// struct sockaddr_storage clientAddrInfoTmp;	// connector's address information
+			// char clientIPTmp[INET6_ADDRSTRLEN];
+			// memset(clientIPTmp, 0, INET6_ADDRSTRLEN);
+			// memcpy(clientIPTmp, clientIP, sizeof clientIP);
+			// memcpy(&clientAddrInfoTmp, &clientAddrInfo, sizeof clientAddrInfo);
+			handleRequest(newfd);
+      close(newfd);
+      exit(0); // child terminates
+    }
 		close(newfd);
 	}
 

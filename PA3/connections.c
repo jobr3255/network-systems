@@ -15,6 +15,7 @@
 #include <unistd.h>
 #include <stdlib.h>
 #include <string.h>
+#include <errno.h>
 
 #define BUFSIZE 65535
 // 6553600
@@ -101,24 +102,13 @@ int handleGet(int fd, char *url, char *version, char *request) {
 	sprintf(&path[0], "/%s", tmpPath);
 	temp = strtok (hostname, ":");
 	temp = strtok (NULL, "");
-	int portno = 80;
+	u_short portno = 80;
 	if(temp) {
-		portno = atoi(temp);
+		portno = (u_short)atoi(temp);
 	}
 	printf("hostname: %s\n", hostname);
 	printf("path: %s\n", path);
 	printf("port: %d\n", portno);
-
-	// Check that the requested URL exists
-	struct hostent *server;
-	server = gethostbyname(hostname);
-	printf("hostname: %s\n", server->h_name);
-	// printf("hostname: %s\n", server->h_addr);
-	if (server == NULL) {
-		fprintf(stderr,"ERROR, no such host as %s\n", url);
-		return 400;
-	}
-	// printf("hostname: %s\n", server->h_addr_list[0]);
 
 	if(!isWhitelisted(hostname)){
 		printf("%s is not whitelisted. Send 403 error\n", hostname);
@@ -128,84 +118,118 @@ int handleGet(int fd, char *url, char *version, char *request) {
 		printf("%s is blacklisted. Send 403 error\n", hostname);
 		return 403;
 	}
-
-	// Create socket for proxy connection to host
+	struct hostent *server;
 	int sockfd;
-	if ((sockfd = socket (AF_INET, SOCK_STREAM, 0)) <0) {
-		perror("Problem in creating the socket");
-		close(fd);
-		exit(2);
+	struct sockaddr_in sockfdaddr;
+
+	/* connect to sockfd */
+	if ((sockfd = socket(PF_INET, SOCK_STREAM, 0)) < 0) {
+		perror("socket");
+		return 400;
+	}
+	server = gethostbyname(hostname);
+	if(!server) {
+		printf("Host %s not found\n", hostname);
+		switch(h_errno) {
+			case HOST_NOT_FOUND:
+				printf("Host could not be identified by the DNS sockfd\n");
+				break;
+			case TRY_AGAIN:
+				printf("Problem with the DNS sockfd. Try again\n");
+				break;
+			default:
+				printf("Unable to resolve this host name to an IP address\n");
+		}
+		// Hostname failed, send Bad request error
+		return 400;
+	}
+	printf("gethostbyname(%s)=%d.%d.%d.%d", hostname, (unsigned char)server->h_addr[0],(unsigned char)server->h_addr[1],(unsigned char)server->h_addr[2],(unsigned char)server->h_addr[3]);
+
+	printf("Trying to connect to %s:%d...\n",hostname, portno);
+	sockfdaddr.sin_family = AF_INET;
+	bcopy(server->h_addr,&sockfdaddr.sin_addr,sizeof(struct in_addr)) ;
+	sockfdaddr.sin_port = htons(portno) ;
+	if(connect(sockfd, (struct sockaddr *) &sockfdaddr, sizeof(struct sockaddr_in)) < 0) {
+		perror("connect");
+		switch(errno) {
+			case ECONNREFUSED:
+				printf("Connection refused\n");
+				break;
+			case ETIMEDOUT:
+				printf("Connection timed out\n");
+				break;
+			case EHOSTUNREACH:
+			case ENETUNREACH:
+				printf("Unreachable\n");
+				break;
+			case EHOSTDOWN:
+			case ENETDOWN:
+				printf("Sorry, this host is down\n");
+				break;
+			default:
+				printf("Host is not responding\n");
+		}
+		return 0;
 	}
 
-  // Set host connection hostname and port
-	struct sockaddr_in serveraddr;
-	memset(&serveraddr, 0, sizeof(serveraddr));
-	serveraddr.sin_family = AF_INET;
-	serveraddr.sin_addr.s_addr= inet_addr(server->h_name);
-	serveraddr.sin_port = htons(portno);
+	printf("Connected to %s:%d\n", hostname, portno);
 
-	//Connection of the client to the socket
-	if (connect(sockfd, (struct sockaddr *) &serveraddr, sizeof(serveraddr))<0) {
-		perror("Problem in connecting to the server");
-		close(fd);
-		exit(3);
-	}
-
-	// Build HTTP response and store it in tempResponse
-	char tempReq[BUFSIZE];
+	// Build HTTP request and store it in tempReq
+	char tempReq[655360];
+ 	memset(tempReq, 0, BUFSIZE);
 	int pos = 0;
 	pos += sprintf(&tempReq[pos], "GET %s %s\n%s", path, version, request);
-
-	// Copy tempReq into req which has the correct size to fit all the data
-	// Solves "Excess found in a non pipelined read" error
-	// char response[responseLength];
-	// char req[pos];
-	// memcpy(req, tempReq, pos);
-
 	char *req;
 	req = (char *) malloc(pos);
 	memcpy(req, tempReq, pos);
-	printf("pos: %d Request: \n%s\n", pos, req);
-	// strcpy(response, tempResponse);
-	// printf ("body size: %ld total size: %ld\n", contentLength, responseLength);
-	// printf("Content-Type: %s\n", contentType);
-	// Send it all!
-	// strcpy(response, tempResponse);
-	// printf ("body size: %ld total size: %ld\n", contentLength, responseLength);
-	// printf("Content-Type: %s\n", contentType);
-	// Send it all!
+	// printf("pos: %d Request: \n%s\n", pos, req);
 	int error = send(sockfd, req, pos, 0);
 	free(req);
 	if (error < 0) {
-		perror("Error sending to server");
+		perror("Error sending to sockfd");
 		close(fd);
 		exit(4);
 	}
+	// printf("sent request %d\n", error);
 
-	// send(sockfd, request, strlen(request), 0);
-	char buf[6553600];
+	char buf[BUFSIZE];
  	memset(buf, 0, BUFSIZE);
 	int n;
   if ((n = recv(sockfd, buf, BUFSIZE,0)) == 0){
-   //error: server terminated prematurely
-   perror("The server terminated prematurely");
+   //error: sockfd terminated prematurely
+   perror("The sockfd terminated prematurely");
+	 switch(errno) {
+		 case ECONNREFUSED:
+			 printf("Connection refused\n");
+			 break;
+		 case EFAULT:
+			 printf("The receive buffer pointer(s) point outside the process's address space.\n");
+			 break;
+		 case ENOTCONN:
+			 printf("The socket is associated with a connection-oriented protocol and has not been connected\n");
+			 break;
+		 case ENOTSOCK:
+			 printf("The file descriptor sockfd does not refer to a socket\n");
+			 break;
+		 default:
+			 printf("Recieved no bytes\n");
+			 break;
+	 }
 	 close(fd);
    exit(5);
   }
-  // printf("n: %d String received from the server: \n%s", n, buf);
-	send(fd, buf, n, 0);
+  // printf("n: %d Received: \n%s\n", strlen(buf), buf);
+  printf("Received: %d bytes\n", strlen(buf));
 
-	// int sockfd = createServerSocket();
-	// struct sockaddr_in serveraddr;
-	// buildServerInternetAddress(serveraddr, server, portno);
-	// int n = sendto(sockfd, buf, size, 0, &serveraddr, sizeof(serveraddr));
-	// if (n < 0)
-	//  error("ERROR in sendto");
-	//
-	// while(1){
-	//  n = recvfrom(sockfd, buf, BUFSIZE, 0,(struct sockaddr *) &clientaddr, &clientlen);
-	// }
-	return 0;
+	char *response;
+	n = strlen(buf);
+	response = (char *) malloc(n);
+	memcpy(response, buf, n);
+	// printf("Response: \n%s\n", response);
+	error = send(fd, response, n, 0);
+	free(response);
+	// send(fd, buf, n, 0);
+	return error;
 }
 
 /**
