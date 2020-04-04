@@ -67,14 +67,19 @@ void handleRequest(int fd) {
 
 	if(strcmp(method,"GET") == 0) {
 		printf("%s\n", temp);
-		handleGet(fd, url, version, request);
+		int error = handleGet(fd, url, version, request);
+		if(error == 400){
+			sendError400(fd, version);
+		}else if(error == 403){
+			sendError403(fd, version);
+		}
 	}else{
 		printf("[ERROR] Bad Request: %s %s\n", method, url);
 		sendError400(fd, version);
 	}
 }
 
-void handleGet(int fd, char *url, char *version, char *request) {
+int handleGet(int fd, char *url, char *version, char *request) {
 	// printf("url: %s\n", url);
 	char hostname[BUFSIZE], tmpPath[BUFSIZE], path[BUFSIZE];
 	memset(hostname, 0, BUFSIZE);
@@ -111,15 +116,24 @@ void handleGet(int fd, char *url, char *version, char *request) {
 	// printf("hostname: %s\n", server->h_addr);
 	if (server == NULL) {
 		fprintf(stderr,"ERROR, no such host as %s\n", url);
-		sendError400(fd, version);
-		return;
+		return 400;
 	}
 	// printf("hostname: %s\n", server->h_addr_list[0]);
+
+	if(!isWhitelisted(hostname)){
+		printf("%s is not whitelisted. Send 403 error\n", hostname);
+		return 403;
+	}
+	if(isBlacklisted(hostname)){
+		printf("%s is blacklisted. Send 403 error\n", hostname);
+		return 403;
+	}
 
 	// Create socket for proxy connection to host
 	int sockfd;
 	if ((sockfd = socket (AF_INET, SOCK_STREAM, 0)) <0) {
 		perror("Problem in creating the socket");
+		close(fd);
 		exit(2);
 	}
 
@@ -133,6 +147,7 @@ void handleGet(int fd, char *url, char *version, char *request) {
 	//Connection of the client to the socket
 	if (connect(sockfd, (struct sockaddr *) &serveraddr, sizeof(serveraddr))<0) {
 		perror("Problem in connecting to the server");
+		close(fd);
 		exit(3);
 	}
 
@@ -163,6 +178,8 @@ void handleGet(int fd, char *url, char *version, char *request) {
 	free(req);
 	if (error < 0) {
 		perror("Error sending to server");
+		close(fd);
+		exit(4);
 	}
 
 	// send(sockfd, request, strlen(request), 0);
@@ -172,7 +189,8 @@ void handleGet(int fd, char *url, char *version, char *request) {
   if ((n = recv(sockfd, buf, BUFSIZE,0)) == 0){
    //error: server terminated prematurely
    perror("The server terminated prematurely");
-   exit(4);
+	 close(fd);
+   exit(5);
   }
   // printf("n: %d String received from the server: \n%s", n, buf);
 	send(fd, buf, n, 0);
@@ -187,27 +205,41 @@ void handleGet(int fd, char *url, char *version, char *request) {
 	// while(1){
 	//  n = recvfrom(sockfd, buf, BUFSIZE, 0,(struct sockaddr *) &clientaddr, &clientlen);
 	// }
+	return 0;
 }
 
-void sendError(int fd, char *version) {
-	// HTTP/1.X 500 Internal Server Error
-	char *message = "Internal Server Error\n";
-	char tmp[40];
-	memcpy( tmp, &version[0], 8);
-	memcpy( &tmp[8], " 500 Internal Server Error", 26);
-	char header[34];
-	memcpy(header, tmp, 34);
-	sendResponseToClient(fd, header, "text/plain", message, strlen(message));
-}
-
+/**
+ *  Send a 400 Bad Request response to client
+ */
 void sendError400(int fd, char *version) {
-	char *message = "Bad Request\n";
-	char tmp[42];
-	memcpy( tmp, &version[0], 8);
-	memcpy( &tmp[8], " 400 Bad Request ", 18);
-	char header[24];
-	memcpy(header, tmp, 24);
-	sendResponseToClient(fd, header, "text/plain", message, strlen(message));
+	char tmp[BUFSIZE];
+	int pos = 0;
+	pos += sprintf(tmp, "%s 400 Bad Request", version);
+	char *header;
+	header = (char *) malloc(pos);
+	memcpy(header, &tmp[0], pos);
+	int error = sendResponseToClient(fd, header, "text/plain", "Bad Request", 11);
+	if (error < 0) {
+		perror("Error sending to client");
+	}
+	free(header);
+}
+
+/**
+ *  Send a 403 Forbidden response to client
+ */
+void sendError403(int fd, char *version) {
+	char tmp[BUFSIZE];
+	int pos = 0;
+	pos += sprintf(tmp, "%s 403 Forbidden", version);
+	char *header;
+	header = (char *) malloc(pos);
+	memcpy(header, &tmp[0], pos);
+	int error = sendResponseToClient(fd, header, "text/plain", "Forbidden", 9);
+	if (error < 0) {
+		perror("Error sending to client");
+	}
+	free(header);
 }
 
 /**
@@ -222,35 +254,48 @@ int sendResponseToClient(int fd, char *header, char *contentType, void *body, in
 	// Build HTTP response and store it in tempResponse
 	char tempResponse[6553600];
 	int pos = 0;
-	pos += sprintf(&tempResponse[pos], "%s\r\n", header);
+	pos += sprintf(tempResponse, "%s\r\n", header);
 	pos += sprintf(&tempResponse[pos], "Content-Type: %s\r\n", contentType);
 	pos += sprintf(&tempResponse[pos], "Content-Length: %d\r\n\r\n", contentLength);
-	// pos += sprintf(&tempResponse[pos], "Connection: %s\r\n", "Closed");
-	// pos += sprintf(&tempResponse[pos], "\r\n%s", body);
 	int responseLength = pos + contentLength;
 	if(contains(contentType, "text")) {
 		pos += sprintf(&tempResponse[pos], "%s", body);
-		// printf ("pos: %d responseLength: %d\n", pos, responseLength);
 		responseLength = pos;
 	}else{
-		// responseLength = pos + contentLength;
 		memcpy(&tempResponse[pos], body, contentLength);
 	}
-
-	// Copy tempResponse into response which has the correct size to fit all the data
-	// Solves "Excess found in a non pipelined read" error
-	// char response[responseLength];
 	char *response;
 	response = (char *) malloc(responseLength);
 	memcpy(response, &tempResponse[0], responseLength);
-	// strcpy(response, tempResponse);
-	// printf ("body size: %ld total size: %ld\n", contentLength, responseLength);
-	// printf("Content-Type: %s\n", contentType);
-	// Send it all!
 	int error = send(fd, response, responseLength, 0);
 	free(response);
-	if (error < 0) {
-		perror("send");
-	}
 	return error;
+}
+
+/**
+ * Check if hostname is whitelisted. Returns 1 if whitelist file does not exist
+ */
+int isWhitelisted(char *hostname){
+	if(fileExists("whitelist") ) {
+		return isInFile(hostname, "whitelist");
+	} else {
+		// If no file exists then return true
+		// printf("Whitelist file does not exist\n");
+		return 1;
+	}
+	return 0;
+}
+
+/**
+ * Check if hostname is blacklisted. Returns 0 if blacklist file does not exist
+ */
+int isBlacklisted(char *hostname){
+	if(fileExists("blacklist") ) {
+		return isInFile(hostname, "blacklist");
+	} else {
+		// If no file exists then return false
+		// printf("Blacklist file does not exist\n");
+		return 0;
+	}
+	return 0;
 }

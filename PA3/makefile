@@ -1,7 +1,7 @@
 CC=gcc
 CFLAGS=-g -Wall -Wextra
 
-OBJS=webproxy.o connections.o helpers.o server-connections.o client-connections.o
+OBJS=webproxy.o connections.o helpers.o server-connections.o
 
 all: webproxy
 
@@ -13,8 +13,6 @@ webproxy.o: webproxy.c connections.h
 connections.o: connections.c connections.h
 
 server-connections.o: server-connections.c server-connections.h
-
-client-connections.o: client-connections.c client-connections.h
 
 helpers.o: helpers.c helpers.h
 

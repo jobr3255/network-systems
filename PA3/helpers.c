@@ -96,61 +96,19 @@ int getFileSize(FILE *file) {
 /**
  * Check if hostname is whitelisted. Returns 1 if whitelist file does not exist
  */
-int isInFile(char *hostname, char *filename){
-	FILE * fp;
-	char * line = NULL;
-	size_t len = 0;
-	ssize_t read;
-
+bool isInFile(char *hostname, char *filename){
+	FILE *fp;
+	char temp[512];
 	fp = fopen(filename, "r");
-	while ((read = getline(&line, &len, fp)) != -1) {
-			if(indexOf(line, hostname) == 0){
-				fclose(fp);
-				return 1;
-			}
+	while(fgets(temp, 512, fp) != NULL) {
+		if((strstr(temp, hostname)) != NULL) {
+			fclose(fp);
+			return true;
+		}
 	}
-	fclose(fp);
-	return 0;
-}
-
-/**
- * Check if hostname is whitelisted. Returns 1 if whitelist file does not exist
- */
-int isWhitelisted(char *hostname){
-	if(fileExists("whitelist") ) {
-		return isInFile(hostname, "whitelist");
-	} else {
-		// If no file exists then return true
-		// printf("Whitelist file does not exist\n");
-		return 1;
+	//Close the file if still open.
+	if(fp) {
+		fclose(fp);
 	}
-	return 0;
+ 	return false;
 }
-
-/**
- * Check if hostname is blacklisted. Returns 0 if blacklist file does not exist
- */
-int isBlacklisted(char *hostname){
-	if(fileExists("blacklist") ) {
-		return isInFile(hostname, "blacklist");
-	} else {
-		// If no file exists then return false
-		// printf("Blacklist file does not exist\n");
-		return 0;
-	}
-	return 0;
-}
-
-/**
- *  Send a 403 Forbidden response to client
- */
-// void sendError403(int fd, char *version) {
-// 	char *message = "Forbidden\n";
-//
-// 	char tmp[40];
-// 	memcpy( tmp, &version[0], 8);
-// 	memcpy( &tmp[8], " 400 Forbidden ", 16);
-// 	char header[24];
-// 	memcpy(header, tmp, 24);
-// 	sendResponseToClient(fd, header, "text/plain", message, strlen(message));
-// }
