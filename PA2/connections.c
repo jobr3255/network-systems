@@ -27,11 +27,12 @@ void handleRequest(int fd) {
 	memset(request, 0, BUFSIZE);
 	// Read request
 	int bytesRecvd = recv(fd, request, BUFSIZE - 1, 0);
+	// printf("recieved %d bytes\n", bytesRecvd);
 	if (bytesRecvd < 0) {
 		perror("recv");
 		return;
 	}
-	// printf("%s\n", request);
+	printf("Request: \n%s\n", request);
 	char tmpReq[BUFSIZE];
 	memset(tmpReq, 0, BUFSIZE);
 	memcpy(tmpReq, request, strlen(request));
