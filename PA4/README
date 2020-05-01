@@ -1,0 +1,24 @@
+**By:** Josh/Chloe Brown
+
+# **Project 4**
+
+Distributed FileSystem
+
+## Compile and run
+
+Run the makefile to compile the files
+```
+PA3$ make
+```
+Run the client
+```
+PA3$ ./dfc [config file]
+```
+Run a server
+```
+PA3$ ./dfs [DFS#] [config file]
+```
+Commands:
+- list
+- get [filename]
+- put [filename]

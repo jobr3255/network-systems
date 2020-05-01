@@ -80,8 +80,11 @@ void handleRequest(int fd) {
 	}
 }
 
+
+// Handles the get request
 int handleGet(int fd, char *url, char *version, char *request) {
 	// printf("url: %s\n", url);
+	// Extract the path and hostname
 	char hostname[BUFSIZE], tmpPath[BUFSIZE], path[BUFSIZE];
 	memset(hostname, 0, BUFSIZE);
 	memset(tmpPath, 0, BUFSIZE);
@@ -110,6 +113,7 @@ int handleGet(int fd, char *url, char *version, char *request) {
 	printf("path: %s\n", path);
 	printf("port: %d\n", portno);
 
+	// Send 403 if page is not whitelisted
 	if(!isWhitelisted(hostname)){
 		printf("%s is not whitelisted. Send 403 error\n", hostname);
 		return 403;
@@ -120,7 +124,7 @@ int handleGet(int fd, char *url, char *version, char *request) {
 	}
 	struct hostent *server;
 	int sockfd;
-	struct sockaddr_in sockfdaddr;
+	struct sockaddr_in serveraddr;
 
 	/* connect to sockfd */
 	if ((sockfd = socket(PF_INET, SOCK_STREAM, 0)) < 0) {
@@ -146,10 +150,10 @@ int handleGet(int fd, char *url, char *version, char *request) {
 	printf("gethostbyname(%s)=%d.%d.%d.%d", hostname, (unsigned char)server->h_addr[0],(unsigned char)server->h_addr[1],(unsigned char)server->h_addr[2],(unsigned char)server->h_addr[3]);
 
 	printf("Trying to connect to %s:%d...\n",hostname, portno);
-	sockfdaddr.sin_family = AF_INET;
-	bcopy(server->h_addr,&sockfdaddr.sin_addr,sizeof(struct in_addr)) ;
-	sockfdaddr.sin_port = htons(portno) ;
-	if(connect(sockfd, (struct sockaddr *) &sockfdaddr, sizeof(struct sockaddr_in)) < 0) {
+	serveraddr.sin_family = AF_INET;
+	bcopy(server->h_addr,&serveraddr.sin_addr,sizeof(struct in_addr)) ;
+	serveraddr.sin_port = htons(portno) ;
+	if(connect(sockfd, (struct sockaddr *) &serveraddr, sizeof(struct sockaddr_in)) < 0) {
 		perror("connect");
 		switch(errno) {
 			case ECONNREFUSED:
@@ -192,10 +196,10 @@ int handleGet(int fd, char *url, char *version, char *request) {
 	}
 	// printf("sent request %d\n", error);
 
-	char buf[BUFSIZE];
- 	memset(buf, 0, BUFSIZE);
+	char buf[655360];
+ 	memset(buf, 0, 655360);
 	int n;
-  if ((n = recv(sockfd, buf, BUFSIZE,0)) == 0){
+  if ((n = recv(sockfd, buf, 655360,0)) == 0){
    //error: sockfd terminated prematurely
    perror("The sockfd terminated prematurely");
 	 switch(errno) {
@@ -218,16 +222,15 @@ int handleGet(int fd, char *url, char *version, char *request) {
 	 close(fd);
    exit(5);
   }
-  // printf("n: %d Received: \n%s\n", strlen(buf), buf);
+  printf("n: %d Received: \n%s\n", strlen(buf), buf);
   printf("Received: %d bytes\n", strlen(buf));
 
-	char *response;
-	n = strlen(buf);
-	response = (char *) malloc(n);
-	memcpy(response, buf, n);
+	// char *response;
+	// response = (char *) malloc(n);
+	// memcpy(response, buf, n);
 	// printf("Response: \n%s\n", response);
-	error = send(fd, response, n, 0);
-	free(response);
+	error = send(fd, buf, n, 0);
+	// free(response);
 	// send(fd, buf, n, 0);
 	return error;
 }
