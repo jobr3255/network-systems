@@ -201,7 +201,7 @@ void * thread(void * vargp) {
 			size1 = atoi(strtok(NULL, ","));
 			piece2 = atoi(strtok(NULL, ","));
 			size2 = atoi(strtok(NULL, ","));
-			printf("Primer: %d, %d, %d, %d\n", piece1, size1, piece2, size2);
+			// printf("Primer: %d, %d, %d, %d\n", piece1, size1, piece2, size2);
 
 			printf("Send ACK\n");
 			// Return acknowledgement
